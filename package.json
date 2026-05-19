@@ -1,0 +1,13 @@
+{
+  "name": "project-management-system",
+  "version": "1.0.0",
+  "description": "Project Management System",
+  "main": "BACKEND/server.js",
+  "scripts": {
+    "start": "cd BACKEND && npm install && node server.js",
+    "dev": "cd BACKEND && npm install && nodemon server.js"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
