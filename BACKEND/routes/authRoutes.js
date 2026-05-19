@@ -34,14 +34,20 @@ router.post("/signup", async (req, res) => {
 
         }
 
-        const token = jwt.sign(
-          {
-            id: result.insertId,
-            role,
-          },
-          process.env.JWT_SECRET,
-          { expiresIn: "1d" }
-        );
+          const secret = process.env.JWT_SECRET;
+          if (!secret) {
+            console.error('JWT_SECRET is not set');
+            return res.status(500).json({ message: 'Server configuration error: JWT_SECRET not set' });
+          }
+
+          const token = jwt.sign(
+            {
+              id: result.insertId,
+              role,
+            },
+            secret,
+            { expiresIn: "1d" }
+          );
 
         res.json({
           message: "User Registered Successfully",
@@ -105,13 +111,19 @@ router.post("/login", (req, res) => {
 
       }
 
+      const secret = process.env.JWT_SECRET;
+      if (!secret) {
+        console.error('JWT_SECRET is not set');
+        return res.status(500).json({ message: 'Server configuration error: JWT_SECRET not set' });
+      }
+
       const token = jwt.sign(
         {
           id: user.id,
           role: user.role,
         },
 
-        process.env.JWT_SECRET,
+        secret,
 
         {
           expiresIn: "1d",
