@@ -7,6 +7,10 @@ dotenv.config();
 
 const app = express();
 
+// Debug: show whether DB connection env vars are present in the runtime
+console.log('ENV DEBUG: MYSQL_URL present =', !!process.env.MYSQL_URL);
+console.log('ENV DEBUG: DB_HOST =', process.env.DB_HOST || 'undefined', 'DB_NAME =', process.env.DB_NAME || 'undefined');
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "frontend")));
