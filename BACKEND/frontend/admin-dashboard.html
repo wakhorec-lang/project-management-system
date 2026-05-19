@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+  <title>Admin Dashboard</title>
+
+  <link rel="stylesheet"
+        href="css/dashboard.css">
+
+</head>
+
+<body>
+
+  <div class="sidebar">
+
+    <h2>Admin Panel</h2>
+
+    <ul>
+      <li><a href="#dashboardSection">Dashboard</a></li>
+      <li><a href="#createProjectSection">Create Project</a></li>
+      <li><a href="#createTaskSection">Create Task</a></li>
+      <li><a href="#manageUsersSection">Manage Users</a></li>
+    </ul>
+
+  </div>
+
+  <div class="main">
+
+    <div class="topbar">
+
+      <h1>
+        Project Management Dashboard
+      </h1>
+
+      <div class="topbar-actions">
+        <button id="themeToggle" onclick="toggleTheme()">Dark Mode</button>
+        <button onclick="logout()">Logout</button>
+      </div>
+
+    </div>
+
+    <div class="cards" id="dashboardSection">
+
+      <div class="card">
+        <h3>Total Projects</h3>
+        <p id="projectCount">0</p>
+      </div>
+
+      <div class="card">
+        <h3>Total Tasks</h3>
+        <p id="taskCount">0</p>
+      </div>
+
+      <div class="card">
+        <h3>Completed Tasks</h3>
+        <p id="completedCount">0</p>
+      </div>
+
+      <div class="card">
+        <h3>Overdue Tasks</h3>
+        <p id="overdueCount">0</p>
+      </div>
+
+    </div>
+
+    <div class="notification-panel">
+      <div class="notification-header">
+        <h2>Notifications</h2>
+        <span class="badge" id="notificationCount">0</span>
+      </div>
+      <div id="notificationList" class="notification-list">
+        <p>No new notifications.</p>
+      </div>
+    </div>
+
+    <div class="form-container" id="createProjectSection">
+      <h2>Create Project</h2>
+      <input type="hidden" id="projectId">
+      <input type="text" id="projectTitle" placeholder="Project Title">
+      <textarea id="projectDescription" placeholder="Project Description"></textarea>
+      <input type="date" id="projectDeadline">
+      <button id="projectSubmitButton" onclick="createOrUpdateProject()">Create Project</button>
+      <button type="button" onclick="resetProjectForm()">Cancel</button>
+    </div>
+
+    <div class="form-container" id="projectListSection">
+      <h2>Project Management</h2>
+      <div class="table-container">
+        <table id="projectTable">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Description</th>
+              <th>Deadline</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="4">Loading projects...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="form-container" id="createTaskSection">
+      <h2>Create Task</h2>
+      <input type="hidden" id="taskId">
+      <input type="text" id="taskTitle" placeholder="Task Title">
+      <textarea id="taskDescription" placeholder="Task Description"></textarea>
+      <input type="date" id="taskDeadline">
+      <select id="taskProject">
+        <option value="">Select Project</option>
+      </select>
+      <select id="taskAssignee">
+        <option value="">Assign To</option>
+      </select>
+      <select id="taskPriority">
+        <option value="medium">Medium Priority</option>
+        <option value="low">Low Priority</option>
+        <option value="high">High Priority</option>
+      </select>
+      <button id="taskSubmitButton" onclick="createOrUpdateTask()">Create Task</button>
+      <button type="button" onclick="resetTaskForm()">Cancel</button>
+    </div>
+
+    <div class="form-container" id="editUserSection">
+      <h2>Edit User Role</h2>
+      <input type="hidden" id="selectedUserId">
+      <p id="selectedUserInfo">Select a user to change role</p>
+      <select id="userRoleSelect">
+        <option value="member">Member</option>
+        <option value="admin">Admin</option>
+      </select>
+      <button type="button" onclick="updateUserRole()">Save Role</button>
+      <button type="button" onclick="resetUserForm()">Cancel</button>
+    </div>
+
+    <div class="form-container" id="manageUsersSection">
+      <h2>Manage Users</h2>
+      <div class="table-container">
+        <table id="userTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="4">Loading users...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="form-container">
+      <h2>Task Table</h2>
+      <div class="table-container">
+        <table id="taskTable">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Project</th>
+              <th>Assignee</th>
+              <th>Deadline</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Overdue</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="7">Loading tasks...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="form-container">
+      <h2>Analytics Charts</h2>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3>Task Status Breakdown</h3>
+          <canvas id="statusChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Task Priority Breakdown</h3>
+          <canvas id="priorityChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="js/dashboard.js"></script>
+
+  <script>
+    function logout() {
+      localStorage.removeItem("token");
+      window.location.href = "index.html";
+    }
+  </script>
+
+</body>
+
+</html>

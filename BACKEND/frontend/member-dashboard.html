@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Member Dashboard</title>
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+
+<body>
+  <div class="sidebar">
+    <h2>Member Panel</h2>
+    <ul>
+      <li><a href="#tasksSection">My Tasks</a></li>
+      <li><a href="#memberProjectsSection">Projects</a></li>
+      <li><a href="#memberProfileSection">Profile</a></li>
+    </ul>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <h1>Member Dashboard</h1>
+      <div class="topbar-actions">
+        <button id="themeToggle" onclick="toggleTheme()">Dark Mode</button>
+        <button onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>My Tasks</h3>
+        <p id="myTaskCount">0</p>
+      </div>
+
+      <div class="card">
+        <h3>Completed Tasks</h3>
+        <p id="completedTaskCount">0</p>
+      </div>
+
+      <div class="card">
+        <h3>Pending Tasks</h3>
+        <p id="pendingTaskCount">0</p>
+      </div>
+
+      <div class="card">
+        <h3>Overdue Tasks</h3>
+        <p id="overdueTaskCount">0</p>
+      </div>
+    </div>
+
+    <div class="notification-panel">
+      <div class="notification-header">
+        <h2>Notifications</h2>
+        <span class="badge" id="memberNotificationCount">0</span>
+      </div>
+      <div id="memberNotificationList" class="notification-list">
+        <p>No new notifications.</p>
+      </div>
+    </div>
+
+    <div class="form-container" id="tasksSection">
+      <h2>View Tasks</h2>
+      <div class="table-container">
+        <table id="tasksTable">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Project</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Deadline</th>
+              <th>Overdue</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="6">Loading your tasks...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="form-container" id="memberProjectsSection">
+      <h2>My Projects</h2>
+      <ul id="memberProjectList" class="project-list">
+        <li>No projects assigned yet.</li>
+      </ul>
+    </div>
+
+    <div class="form-container" id="memberProfileSection">
+      <h2>Profile</h2>
+      <p><strong>Name:</strong> <span id="profileName">Loading...</span></p>
+      <p><strong>Email:</strong> <span id="profileEmail">Loading...</span></p>
+      <p><strong>Role:</strong> <span id="profileRole">Loading...</span></p>
+    </div>
+  </div>
+
+  <script>
+    function logout() {
+      localStorage.removeItem("token");
+      window.location.href = "index.html";
+    }
+
+    const THEME_KEY = "pmTheme";
+
+    function applyTheme(theme) {
+      document.documentElement.classList.toggle("dark-theme", theme === "dark");
+      const button = document.getElementById("themeToggle");
+      if (button) {
+        button.textContent = theme === "dark" ? "Light Mode" : "Dark Mode";
+      }
+    }
+
+    function loadTheme() {
+      const saved = localStorage.getItem(THEME_KEY) || "light";
+      applyTheme(saved);
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.classList.contains("dark-theme") ? "dark" : "light";
+      const next = current === "dark" ? "light" : "dark";
+      localStorage.setItem(THEME_KEY, next);
+      applyTheme(next);
+    }
+
+    function updateTaskStatus(taskId, status) {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        window.location.href = "index.html";
+        return;
+      }
+
+      fetch(`/api/tasks/${taskId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.message) {
+            loadTasks();
+          }
+        })
+        .catch((err) => console.error("Error updating task status:", err));
+    }
+
+    function loadTasks() {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        window.location.href = "index.html";
+        return;
+      }
+
+      fetch("/api/tasks", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      })
+      .then(res => res.json())
+      .then(data => {
+        const tableBody = document.querySelector("#tasksTable tbody");
+        if (Array.isArray(data) && data.length > 0) {
+          let rows = "";
+          let completed = 0;
+          let overdue = 0;
+          const today = new Date();
+          const dueSoon = new Date();
+          dueSoon.setDate(today.getDate() + 3);
+          const notifications = [];
+
+          data.forEach(task => {
+            if (task.status === "completed") completed += 1;
+            const deadlineDate = task.deadline ? new Date(task.deadline) : null;
+            const isOverdue = deadlineDate && task.status !== "completed" && deadlineDate < today;
+            if (isOverdue) overdue += 1;
+
+            if (deadlineDate && task.status !== "completed") {
+              if (deadlineDate < today) {
+                notifications.push({
+                  type: "Overdue",
+                  message: `${task.title} is overdue.`,
+                });
+              } else if (deadlineDate <= dueSoon) {
+                notifications.push({
+                  type: "Due Soon",
+                  message: `${task.title} is due on ${task.deadline}.`,
+                });
+              }
+            }
+
+            const statusOptions = ["pending", "in progress", "completed"]
+              .map((status) => `
+                <option value="${status}" ${task.status === status ? "selected" : ""}>
+                  ${status}
+                </option>`)
+              .join("");
+
+            rows += `
+              <tr class="${isOverdue ? "overdue-row" : ""}">
+                <td>${task.title}</td>
+                <td>${task.project_title || "N/A"}</td>
+                <td>${task.priority || "medium"}</td>
+                <td>
+                  <select onchange="updateTaskStatus(${task.id}, this.value)">
+                    ${statusOptions}
+                  </select>
+                </td>
+                <td>${task.deadline || "-"}</td>
+                <td>${isOverdue ? "Yes" : "No"}</td>
+              </tr>
+            `;
+          });
+
+          tableBody.innerHTML = rows;
+          document.getElementById("myTaskCount").textContent = data.length;
+          document.getElementById("completedTaskCount").textContent = completed;
+          document.getElementById("pendingTaskCount").textContent = data.length - completed;
+          document.getElementById("overdueTaskCount").textContent = overdue;
+          renderMemberProjects(data);
+          renderMemberNotifications(notifications);
+        } else {
+          tableBody.innerHTML = `<tr><td colspan="6">No tasks assigned yet.</td></tr>`;
+          document.getElementById("myTaskCount").textContent = 0;
+          document.getElementById("completedTaskCount").textContent = 0;
+          document.getElementById("pendingTaskCount").textContent = 0;
+          document.getElementById("overdueTaskCount").textContent = 0;
+          renderMemberNotifications([]);
+        }
+      })
+      .catch(err => {
+        console.error("Error:", err);
+        document.querySelector("#tasksTable tbody").innerHTML = `<tr><td colspan="6">Unable to load tasks.</td></tr>`;
+      });
+    }
+
+    function renderMemberNotifications(notifications) {
+      const list = document.getElementById("memberNotificationList");
+      const count = document.getElementById("memberNotificationCount");
+      if (!list || !count) return;
+
+      count.textContent = notifications.length;
+      if (notifications.length === 0) {
+        list.innerHTML = "<p>No new notifications.</p>";
+        return;
+      }
+
+      list.innerHTML = notifications.map(item => `
+        <div class="notification-item ${item.type === "Overdue" ? "notification-overdue" : "notification-due-soon"}">
+          <span class="notification-type">${item.type}</span>
+          <p>${item.message}</p>
+        </div>
+      `).join("");
+    }
+
+    function renderMemberProjects(tasks) {
+      const list = document.getElementById("memberProjectList");
+      if (!list) return;
+
+      const projects = [...new Map(
+        tasks
+          .filter((task) => task.project_title)
+          .map((task) => [task.project_id, task.project_title])
+      ).values()];
+
+      if (projects.length === 0) {
+        list.innerHTML = "<li>No projects assigned yet.</li>";
+        return;
+      }
+
+      list.innerHTML = projects.map((project) => `<li>${project}</li>`).join("");
+    }
+
+    function renderProfile() {
+      const name = localStorage.getItem("userName") || "Unknown";
+      const email = localStorage.getItem("userEmail") || "Unknown";
+      const role = localStorage.getItem("userRole") || "Member";
+
+      const nameEl = document.getElementById("profileName");
+      const emailEl = document.getElementById("profileEmail");
+      const roleEl = document.getElementById("profileRole");
+
+      if (nameEl) nameEl.textContent = name;
+      if (emailEl) emailEl.textContent = email;
+      if (roleEl) roleEl.textContent = role;
+    }
+
+    loadTheme();
+    loadTasks();
+    renderProfile();
+  </script>
+</body>
+
+</html>
