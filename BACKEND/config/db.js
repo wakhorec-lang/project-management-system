@@ -9,16 +9,8 @@ const {
   MYSQL_URL,
 } = process.env;
 
-const connectionOptions = MYSQL_URL
-  ? MYSQL_URL
-  : {
-      host: DB_HOST,
-      user: DB_USER,
-      password: DB_PASSWORD,
-      multipleStatements: false,
-    };
-
-const connection = mysql.createConnection(connectionOptions);
+// Pool instance that will be assigned once the database is ready and exported.
+let pool;
 
 function createTables() {
   const createUserTable = `
@@ -60,19 +52,19 @@ function createTables() {
     )
   `;
 
-  connection.query(createUserTable, (err) => {
+  pool.query(createUserTable, (err) => {
     if (err) console.log("Error creating users table:", err);
   });
 
-  connection.query(createProjectTable, (err) => {
+  pool.query(createProjectTable, (err) => {
     if (err) console.log("Error creating projects table:", err);
   });
 
-  connection.query(createTaskTable, (err) => {
+  pool.query(createTaskTable, (err) => {
     if (err) console.log("Error creating tasks table:", err);
   });
 
-  connection.query(
+  pool.query(
     "SHOW COLUMNS FROM tasks LIKE 'status'",
     (showErr, showResult) => {
       if (showErr) {
@@ -81,7 +73,7 @@ function createTables() {
       }
 
       if (showResult.length === 0) {
-        connection.query(
+        pool.query(
           "ALTER TABLE tasks ADD COLUMN status ENUM('pending', 'in progress', 'completed') DEFAULT 'pending'",
           (alterErr) => {
             if (alterErr) {
@@ -94,45 +86,85 @@ function createTables() {
   );
 }
 
-connection.connect((err) => {
-  if (err) {
-    console.log("Database Connection Error");
-    console.log(err);
-    return;
-  }
+if (MYSQL_URL) {
+  // When a full connection URL is provided, create the pool directly.
+  pool = mysql.createPool({
+    uri: MYSQL_URL,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+  });
 
-  if (MYSQL_URL) {
+  pool.getConnection((err, connection) => {
+    if (err) {
+      console.log("Database Connection Error");
+      console.log(err);
+      return;
+    }
+    connection.release();
     console.log("MySQL Connected Successfully using MYSQL_URL");
     createTables();
-    return;
-  }
-
+  });
+} else {
+  // When individual credentials are provided, first ensure the target database
+  // exists using a temporary connection, then build the pool with the database
+  // selected so all pooled connections start in the right schema.
   if (!DB_NAME) {
     console.log("DB_NAME is missing");
-    return;
-  }
+  } else {
+    const tempConnection = mysql.createConnection({
+      host: DB_HOST,
+      user: DB_USER,
+      password: DB_PASSWORD,
+      multipleStatements: false,
+    });
 
-  connection.query(
-    `CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
-    (createErr) => {
-      if (createErr) {
-        console.log("Database creation error");
-        console.log(createErr);
+    tempConnection.connect((err) => {
+      if (err) {
+        console.log("Database Connection Error");
+        console.log(err);
         return;
       }
 
-      connection.changeUser({ database: DB_NAME }, (changeErr) => {
-        if (changeErr) {
-          console.log("Database selection error");
-          console.log(changeErr);
-          return;
+      tempConnection.query(
+        `CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+        (createErr) => {
+          tempConnection.destroy();
+
+          if (createErr) {
+            console.log("Database creation error");
+            console.log(createErr);
+            return;
+          }
+
+          // Build the pool now that the database is guaranteed to exist.
+          pool = mysql.createPool({
+            host: DB_HOST,
+            user: DB_USER,
+            password: DB_PASSWORD,
+            database: DB_NAME,
+            waitForConnections: true,
+            connectionLimit: 10,
+            queueLimit: 0,
+            multipleStatements: false,
+          });
+
+          pool.getConnection((connErr, connection) => {
+            if (connErr) {
+              console.log("Database selection error");
+              console.log(connErr);
+              return;
+            }
+            connection.release();
+            console.log("MySQL Connected Successfully");
+            createTables();
+          });
         }
+      );
+    });
+  }
+}
 
-        console.log("MySQL Connected Successfully");
-        createTables();
-      });
-    }
-  );
-});
-
-module.exports = connection;
+module.exports = {
+  query: (...args) => pool.query(...args),
+};
